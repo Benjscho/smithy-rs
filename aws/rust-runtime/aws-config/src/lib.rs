@@ -228,6 +228,9 @@ mod loader {
     use aws_smithy_runtime_api::client::identity::{ResolveCachedIdentity, SharedIdentityCache};
     use aws_smithy_runtime_api::client::stalled_stream_protection::StalledStreamProtectionConfig;
     use aws_smithy_runtime_api::shared::IntoShared;
+    use aws_smithy_types::checksum_config::{
+        RequestChecksumCalculation, ResponseChecksumValidation,
+    };
     use aws_smithy_types::retry::RetryConfig;
     use aws_smithy_types::timeout::TimeoutConfig;
     use aws_types::app_name::AppName;
@@ -238,7 +241,7 @@ mod loader {
     use aws_types::SdkConfig;
 
     use crate::default_provider::{
-        app_name, credentials, disable_request_compression, endpoint_url,
+        app_name, checksums, credentials, disable_request_compression, endpoint_url,
         ignore_configured_endpoint_urls as ignore_ep, region, request_min_compression_size_bytes,
         retry_config, timeout_config, use_dual_stack, use_fips,
     };
@@ -289,6 +292,8 @@ mod loader {
         env: Option<Env>,
         fs: Option<Fs>,
         behavior_version: Option<BehaviorVersion>,
+        request_checksum_calculation: Option<RequestChecksumCalculation>,
+        response_checksum_validation: Option<ResponseChecksumValidation>,
     }
 
     impl ConfigLoader {
@@ -519,6 +524,16 @@ mod loader {
             ret
         }
 
+        /// Ignore any environment variables on the host during config resolution
+        ///
+        /// This allows for testing in a reproducible environment that ensures any
+        /// environment variables from the host do not influence environment variable
+        /// resolution.
+        pub fn empty_test_environment(mut self) -> Self {
+            self.env = Some(Env::from_slice(&[]));
+            self
+        }
+
         /// Override the access token provider used to build [`SdkConfig`].
         ///
         /// # Examples
@@ -717,6 +732,36 @@ mod loader {
             self
         }
 
+        /// Set the checksum calculation strategy to use when making requests.
+        /// # Examples
+        /// ```
+        /// use aws_types::SdkConfig;
+        /// use aws_smithy_types::checksum_config::RequestChecksumCalculation;
+        /// let config = SdkConfig::builder().request_checksum_calculation(RequestChecksumCalculation::WhenSupported).build();
+        /// ```
+        pub fn request_checksum_calculation(
+            mut self,
+            request_checksum_calculation: RequestChecksumCalculation,
+        ) -> Self {
+            self.request_checksum_calculation = Some(request_checksum_calculation);
+            self
+        }
+
+        /// Set the checksum calculation strategy to use for responses.
+        /// # Examples
+        /// ```
+        /// use aws_types::SdkConfig;
+        /// use aws_smithy_types::checksum_config::ResponseChecksumValidation;
+        /// let config = SdkConfig::builder().response_checksum_validation(ResponseChecksumValidation::WhenSupported).build();
+        /// ```
+        pub fn response_checksum_validation(
+            mut self,
+            response_checksum_validation: ResponseChecksumValidation,
+        ) -> Self {
+            self.response_checksum_validation = Some(response_checksum_validation);
+            self
+        }
+
         /// Load the default configuration chain
         ///
         /// If fields have been overridden during builder construction, the override values will be used.
@@ -782,6 +827,7 @@ mod loader {
                     .region()
                     .await
             };
+            let conf = conf.with_region(region.clone());
 
             let retry_config = if let Some(retry_config) = self.retry_config {
                 retry_config
@@ -908,6 +954,22 @@ mod loader {
                 Some(user_cache) => Some(user_cache),
             };
 
+            let request_checksum_calculation =
+                if let Some(request_checksum_calculation) = self.request_checksum_calculation {
+                    Some(request_checksum_calculation)
+                } else {
+                    checksums::request_checksum_calculation_provider(&conf).await
+                };
+
+            let response_checksum_validation =
+                if let Some(response_checksum_validation) = self.response_checksum_validation {
+                    Some(response_checksum_validation)
+                } else {
+                    checksums::response_checksum_validation_provider(&conf).await
+                };
+
+            builder.set_request_checksum_calculation(request_checksum_calculation);
+            builder.set_response_checksum_validation(response_checksum_validation);
             builder.set_identity_cache(identity_cache);
             builder.set_credentials_provider(credentials_provider);
             builder.set_token_provider(token_provider);
@@ -948,6 +1010,7 @@ mod loader {
         use aws_types::app_name::AppName;
         use aws_types::origin::Origin;
         use aws_types::os_shim_internal::{Env, Fs};
+        use aws_types::sdk_config::{RequestChecksumCalculation, ResponseChecksumValidation};
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
 
@@ -1126,6 +1189,30 @@ mod loader {
             let app_name = AppName::new("my-app-name").unwrap();
             let conf = base_conf().app_name(app_name.clone()).load().await;
             assert_eq!(Some(&app_name), conf.app_name());
+        }
+
+        #[tokio::test]
+        async fn request_checksum_calculation() {
+            let conf = base_conf()
+                .request_checksum_calculation(RequestChecksumCalculation::WhenRequired)
+                .load()
+                .await;
+            assert_eq!(
+                Some(RequestChecksumCalculation::WhenRequired),
+                conf.request_checksum_calculation()
+            );
+        }
+
+        #[tokio::test]
+        async fn response_checksum_validation() {
+            let conf = base_conf()
+                .response_checksum_validation(ResponseChecksumValidation::WhenRequired)
+                .load()
+                .await;
+            assert_eq!(
+                Some(ResponseChecksumValidation::WhenRequired),
+                conf.response_checksum_validation()
+            );
         }
 
         #[cfg(feature = "rustls")]

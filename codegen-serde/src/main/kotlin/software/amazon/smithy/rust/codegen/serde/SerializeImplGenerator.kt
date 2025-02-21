@@ -462,8 +462,8 @@ class SerializeImplGenerator(private val codegenContext: CodegenContext) {
         }
 
     private fun serializeBlob(shape: BlobShape): RuntimeType =
-        RuntimeType.forInlineFun("SerializeBlob", Companion.PrimitiveShapesModule) {
-            implSerializeConfigured(codegenContext.symbolProvider.toSymbol(shape)) {
+        RuntimeType.forInlineFun("SerializeBlob", PrimitiveShapesModule) {
+            implSerializeConfigured(RuntimeType.blob(codegenContext.runtimeConfig).toSymbol()) {
                 rustTemplate(
                     """
                     if serializer.is_human_readable() {
@@ -478,7 +478,7 @@ class SerializeImplGenerator(private val codegenContext: CodegenContext) {
         }
 
     private fun serializeByteStream(shape: BlobShape): RuntimeType =
-        RuntimeType.forInlineFun("SerializeByteStream", Companion.PrimitiveShapesModule) {
+        RuntimeType.forInlineFun("SerializeByteStream", PrimitiveShapesModule) {
             implSerializeConfigured(RuntimeType.byteStream(codegenContext.runtimeConfig).toSymbol()) {
                 // This doesn't work yet—there is no way to get data out of a ByteStream from a sync context
                 rustTemplate(
@@ -498,7 +498,7 @@ class SerializeImplGenerator(private val codegenContext: CodegenContext) {
         }
 
     private fun serializeDocument(shape: DocumentShape): RuntimeType =
-        RuntimeType.forInlineFun("SerializeDocument", Companion.PrimitiveShapesModule) {
+        RuntimeType.forInlineFun("SerializeDocument", PrimitiveShapesModule) {
             implSerializeConfigured(codegenContext.symbolProvider.toSymbol(shape)) {
                 rustTemplate(
                     """
@@ -545,7 +545,7 @@ class SerializeImplGenerator(private val codegenContext: CodegenContext) {
         rustTemplate(
             """
             impl<'a> #{serde}::Serialize for #{ConfigurableSerdeRef}<'a, #{Shape}> {
-                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                fn serialize<S>(&self, serializer: S) -> #{Result}<S::Ok, S::Error>
                 where
                     S: #{serde}::Serializer,
                 {
@@ -567,7 +567,7 @@ class SerializeImplGenerator(private val codegenContext: CodegenContext) {
             rustTemplate(
                 """
                 impl<'a, 'b> #{serde}::Serialize for #{ConfigurableSerdeRef}<'a, #{Shape}<'b>> {
-                    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                    fn serialize<S>(&self, serializer: S) -> #{Result}<S::Ok, S::Error>
                     where
                         S: #{serde}::Serializer,
                     {

@@ -19,8 +19,10 @@ import software.amazon.smithy.rust.codegen.core.rustlang.rustTemplate
 import software.amazon.smithy.rust.codegen.core.rustlang.writable
 import software.amazon.smithy.rust.codegen.core.smithy.CodegenContext
 import software.amazon.smithy.rust.codegen.core.smithy.RuntimeType
+import software.amazon.smithy.rust.codegen.core.smithy.protocols.parse.CborParserCustomization
 import software.amazon.smithy.rust.codegen.core.smithy.protocols.parse.CborParserGenerator
 import software.amazon.smithy.rust.codegen.core.smithy.protocols.parse.StructuredDataParserGenerator
+import software.amazon.smithy.rust.codegen.core.smithy.protocols.serialize.CborSerializerCustomization
 import software.amazon.smithy.rust.codegen.core.smithy.protocols.serialize.CborSerializerGenerator
 import software.amazon.smithy.rust.codegen.core.smithy.protocols.serialize.StructuredDataSerializerGenerator
 import software.amazon.smithy.rust.codegen.core.smithy.transformers.OperationNormalizer
@@ -92,7 +94,11 @@ class RpcV2CborHttpBindingResolver(
         ProtocolContentTypes.eventStreamMemberContentType(model, memberShape, "application/cbor")
 }
 
-open class RpcV2Cbor(val codegenContext: CodegenContext) : Protocol {
+open class RpcV2Cbor(
+    val codegenContext: CodegenContext,
+    private val serializeCustomization: List<CborSerializerCustomization> = listOf(),
+    private val parserCustomization: List<CborParserCustomization> = listOf(),
+) : Protocol {
     private val runtimeConfig = codegenContext.runtimeConfig
 
     override val httpBindingResolver: HttpBindingResolver =
@@ -134,10 +140,11 @@ open class RpcV2Cbor(val codegenContext: CodegenContext) : Protocol {
                     )
                 }
             },
+            customizations = parserCustomization,
         )
 
     override fun structuredDataSerializer(): StructuredDataSerializerGenerator =
-        CborSerializerGenerator(codegenContext, httpBindingResolver)
+        CborSerializerGenerator(codegenContext, httpBindingResolver, customizations = serializeCustomization)
 
     override fun parseHttpErrorMetadata(operationShape: OperationShape): RuntimeType =
         RuntimeType.cborErrors(runtimeConfig).resolve("parse_error_metadata")
@@ -146,7 +153,7 @@ open class RpcV2Cbor(val codegenContext: CodegenContext) : Protocol {
         ProtocolFunctions.crossOperationFn("parse_event_stream_error_metadata") { fnName ->
             rustTemplate(
                 """
-                pub fn $fnName(payload: &#{Bytes}) -> Result<#{ErrorMetadataBuilder}, #{DeserializeError}> {
+                pub fn $fnName(payload: &#{Bytes}) -> #{Result}<#{ErrorMetadataBuilder}, #{DeserializeError}> {
                     #{cbor_errors}::parse_error_metadata(0, &#{Headers}::new(), payload)
                 }
                 """,
@@ -157,6 +164,7 @@ open class RpcV2Cbor(val codegenContext: CodegenContext) : Protocol {
                     CargoDependency.smithyCbor(runtimeConfig).toType()
                         .resolve("decode::DeserializeError"),
                 "Headers" to RuntimeType.headers(runtimeConfig),
+                *RuntimeType.preludeScope,
             )
         }
 

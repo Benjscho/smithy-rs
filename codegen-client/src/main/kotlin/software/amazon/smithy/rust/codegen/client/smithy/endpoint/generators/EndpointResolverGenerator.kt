@@ -140,6 +140,7 @@ internal class EndpointResolverGenerator(
             "EndpointError" to types.resolveEndpointError,
             "ServiceSpecificEndpointResolver" to codegenContext.serviceSpecificEndpointResolver(),
             "DiagnosticCollector" to EndpointsLib.DiagnosticCollector,
+            *preludeScope,
         )
 
     private val allowLintsForResolver =
@@ -154,6 +155,8 @@ internal class EndpointResolverGenerator(
             "clippy::comparison_to_empty",
             // we generate `if let Some(_) = ... { ... }`
             "clippy::redundant_pattern_matching",
+            // we generate `if (s.as_ref() as &str) == ("arn:") { ... }`, and `s` can be either `String` or `&str`
+            "clippy::useless_asref",
         )
     private val context = Context(registry, runtimeConfig)
 
@@ -193,7 +196,7 @@ internal class EndpointResolverGenerator(
                         Self { #{custom_fields_init:W} }
                     }
 
-                    fn resolve_endpoint(&self, params: &#{Params}) -> Result<#{SmithyEndpoint}, #{BoxError}> {
+                    fn resolve_endpoint(&self, params: &#{Params}) -> #{Result}<#{SmithyEndpoint}, #{BoxError}> {
                         let mut diagnostic_collector = #{DiagnosticCollector}::new();
                         Ok(#{resolver_fn}(params, &mut diagnostic_collector, #{additional_args})
                             .map_err(|err|err.with_source(diagnostic_collector.take_last_error()))?)

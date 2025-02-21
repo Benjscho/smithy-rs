@@ -38,7 +38,7 @@ on:
         required: false
 
 env:
-  rust_version: 1.78.0
+  rust_version: 1.81.0
   rust_toolchain_components: clippy,rustfmt
   ENCRYPTED_DOCKER_PASSWORD: ${{ secrets.ENCRYPTED_DOCKER_PASSWORD }}
   DOCKER_LOGIN_TOKEN_PASSPHRASE: ${{ secrets.DOCKER_LOGIN_TOKEN_PASSPHRASE }}
@@ -108,6 +108,8 @@ jobs:
           runner: smithy_ubuntu-latest_8-core
           fetch-depth: 0
         - action: check-sdk-codegen-unit-tests
+          runner: ubuntu-latest
+        - action: check-fuzzgen
           runner: ubuntu-latest
         - action: check-server-codegen-integration-tests
           runner: smithy_ubuntu-latest_8-core

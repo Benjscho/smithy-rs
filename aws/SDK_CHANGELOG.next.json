@@ -6,59 +6,88 @@
   "smithy-rs": [],
   "aws-sdk-rust": [
     {
-      "message": "Fix minimum throughput detection for downloads to avoid incorrectly raising an error while the user is consuming data at a slow but steady pace.\n",
-      "meta": {
-        "bug": true,
-        "breaking": false,
-        "tada": false
-      },
-      "author": "ysaito1001",
-      "references": [
-        "smithy-rs#3871",
-        "aws-sdk-rust#1202"
-      ],
-      "since-commit": "1e803494dc1c9f1d8290cf9317ed39b026a603a2",
-      "age": 5
-    },
-    {
-      "message": "Client SDKs built with the `awsQueryCompatible` trait now include the `x-amzn-query-mode` header. This header signals the service that the clients are operating in compatible mode.\n",
-      "meta": {
-        "bug": false,
-        "breaking": false,
-        "tada": false
-      },
-      "author": "ysaito1001",
-      "references": [
-        "smithy-rs#3883"
-      ],
-      "since-commit": "c606065c0e2e97d3cecb6a675ffc226dc488d674",
-      "age": 4
-    },
-    {
-      "message": "Fix default credential provider chain not respecting endpoint URL overrides from environment\n",
-      "meta": {
-        "bug": true,
-        "breaking": false,
-        "tada": false
-      },
-      "author": "aajtodd",
-      "references": [
-        "aws-sdk-rust#1193"
-      ],
-      "since-commit": "c606065c0e2e97d3cecb6a675ffc226dc488d674",
-      "age": 4
-    },
-    {
-      "message": "Add auth token generator for Amazon Aurora DSQL.\n\n```rust\nuse aws_sdk_dsql::auth_token::{AuthTokenGenerator, Config};\n\n#[tokio::main]\nasync fn main() {\n   let cfg = aws_config::load_defaults(BehaviorVersion::latest()).await;\n   let generator = AuthTokenGenerator::new(\n       Config::builder()\n           .hostname(\"peccy.dsql.us-east-1.on.aws\")\n           .build()\n           .expect(\"cfg is valid\"),\n   );\n   let token = generator.auth_token(&cfg).await.unwrap();\n   println!(\"{token}\");\n}\n```\n\nThe resulting token can then be used as a password when connecting to the\ndatabase server.\n",
+      "message": "Allow IMDS clients to be configured with a user-provided `SharedRetryClassifier`.\n",
       "meta": {
         "bug": false,
         "breaking": false,
         "tada": true
       },
-      "author": "Velfi",
-      "references": [],
-      "since-commit": "039177d0ee6dd288ad57de2230a1110bbe7ff7d5",
-      "age": 1
+      "author": "landonxjames",
+      "references": [
+        "aws-sdk-rust#1233"
+      ],
+      "since-commit": "721e8a6762ed19194432bed0cb78b08a460d2fe4",
+      "age": 5
+    },
+    {
+      "message": "Fix `EcsCredentialsProvider` to include query params passed via `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`.\n",
+      "meta": {
+        "bug": true,
+        "breaking": false,
+        "tada": false
+      },
+      "author": "ysaito1001",
+      "references": [
+        "aws-sdk-rust#1248"
+      ],
+      "since-commit": "721e8a6762ed19194432bed0cb78b08a460d2fe4",
+      "age": 5
+    },
+    {
+      "message": "Stop populating `SessionMode` by default for the `CreateSession` API internally used by S3 Express. This will allow the service to choose a default value for `SessionMode` field based on bucket/access point being used.\n",
+      "meta": {
+        "bug": true,
+        "breaking": false,
+        "tada": false
+      },
+      "author": "ysaito1001",
+      "references": [
+        "smithy-rs#3992"
+      ],
+      "since-commit": "5ed776ffe2791f577639cb25c711002719809b3a",
+      "age": 3
+    },
+    {
+      "message": "Exclude `transfer-encoding` header from sigv4(a) signing since it is a hop by hop header that can be modified or removed by a proxy.\n",
+      "meta": {
+        "bug": true,
+        "breaking": false,
+        "tada": false
+      },
+      "author": "landonxjames",
+      "references": [
+        "smithy-rs#3991"
+      ],
+      "since-commit": "5ed776ffe2791f577639cb25c711002719809b3a",
+      "age": 3
+    },
+    {
+      "message": "Fix bug in Sigv4 signing that, when an endpoint contained a default port (80 for HTTP, 443 for HTTPS), would sign the request with that port in the `HOST` header even though Hyper excludes default ports from the `HOST` header.\n",
+      "meta": {
+        "bug": true,
+        "breaking": false,
+        "tada": false
+      },
+      "author": "landonxjames",
+      "references": [
+        "aws-sdk-rust#1244"
+      ],
+      "since-commit": "0071c6db2e5e4979d592f6d9f1c019068a4afa02",
+      "age": 2
+    },
+    {
+      "message": "Fix bug in S3 with flexible checksum headers incorrectly included in presigned GET requests.\n",
+      "meta": {
+        "bug": true,
+        "breaking": false,
+        "tada": false
+      },
+      "author": "landonxjames",
+      "references": [
+        "aws-sdk-rust#1253"
+      ],
+      "since-commit": "0071c6db2e5e4979d592f6d9f1c019068a4afa02",
+      "age": 2
     }
   ],
   "aws-sdk-model": []

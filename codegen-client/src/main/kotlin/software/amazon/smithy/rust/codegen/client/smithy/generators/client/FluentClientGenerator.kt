@@ -148,7 +148,7 @@ class FluentClientGenerator(
                         &self.handle.conf
                     }
 
-                    fn validate_config(handle: &Handle) -> Result<(), #{BoxError}> {
+                    fn validate_config(handle: &Handle) -> #{Result}<(), #{BoxError}> {
                         let mut cfg = #{ConfigBag}::base();
                         handle.runtime_plugins
                             .apply_client_configuration(&mut cfg)?
@@ -266,11 +266,14 @@ private fun baseClientRuntimePluginsFn(
                     ::std::mem::swap(&mut config.runtime_plugins, &mut configured_plugins);
                     #{update_bmv}
 
+                    let default_retry_partition = ${codegenContext.serviceShape.sdkId().dq()};
+                    #{before_plugin_setup}
+
                     let mut plugins = #{RuntimePlugins}::new()
                         // defaults
                         .with_client_plugins(#{default_plugins}(
                             #{DefaultPluginParams}::new()
-                                .with_retry_partition_name(${codegenContext.serviceShape.sdkId().dq()})
+                                .with_retry_partition_name(default_retry_partition)
                                 .with_behavior_version(config.behavior_version.expect(${behaviorVersionError.dq()}))
                         ))
                         // user config
@@ -297,6 +300,13 @@ private fun baseClientRuntimePluginsFn(
                         writeCustomizations(
                             customizations,
                             FluentClientSection.AdditionalBaseClientPlugins("plugins", "config"),
+                        )
+                    },
+                "before_plugin_setup" to
+                    writable {
+                        writeCustomizations(
+                            customizations,
+                            FluentClientSection.BeforeBaseClientPluginSetup("config"),
                         )
                     },
                 "DefaultPluginParams" to rt.resolve("client::defaults::DefaultPluginParams"),

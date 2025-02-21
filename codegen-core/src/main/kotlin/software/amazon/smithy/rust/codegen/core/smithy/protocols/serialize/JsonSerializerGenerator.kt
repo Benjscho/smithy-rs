@@ -76,6 +76,10 @@ sealed class JsonSerializerSection(name: String) : Section(name) {
     /** Mutate the output object prior to finalization. */
     data class OutputStruct(val structureShape: StructureShape, val jsonObject: String) :
         JsonSerializerSection("OutputStruct")
+
+    /** Allow customizers to perform pre-serialization operations before handling union variants. */
+    data class BeforeSerializeUnion(val shape: UnionShape, val jsonObject: String) :
+        JsonSerializerSection("BeforeSerializeUnion")
 }
 
 /**
@@ -207,7 +211,7 @@ class JsonSerializerGenerator(
             }
         return protocolFunctions.serializeFn(structureShape, fnNameSuffix = suffix) { fnName ->
             rustBlockTemplate(
-                "pub fn $fnName(value: &#{target}) -> Result<String, #{Error}>",
+                "pub fn $fnName(value: &#{target}) -> #{Result}<String, #{Error}>",
                 *codegenScope,
                 "target" to symbolProvider.toSymbol(structureShape),
             ) {
@@ -281,7 +285,7 @@ class JsonSerializerGenerator(
         val inputShape = operationShape.inputShape(model)
         return protocolFunctions.serializeFn(operationShape, fnNameSuffix = "input") { fnName ->
             rustBlockTemplate(
-                "pub fn $fnName(input: &#{target}) -> Result<#{SdkBody}, #{Error}>",
+                "pub fn $fnName(input: &#{target}) -> #{Result}<#{SdkBody}, #{Error}>",
                 *codegenScope, "target" to symbolProvider.toSymbol(inputShape),
             ) {
                 rust("let mut out = String::new();")
@@ -356,7 +360,7 @@ class JsonSerializerGenerator(
                     pub fn $fnName(
                         #{AllowUnusedVariables:W} object: &mut #{JsonObjectWriter},
                         #{AllowUnusedVariables:W} input: &#{StructureSymbol},
-                    ) -> Result<(), #{Error}>
+                    ) -> #{Result}<(), #{Error}>
                     """,
                     "StructureSymbol" to symbolProvider.toSymbol(context.shape),
                     "AllowUnusedVariables" to allowUnusedVariables,
@@ -541,10 +545,14 @@ class JsonSerializerGenerator(
         val unionSerializer =
             protocolFunctions.serializeFn(context.shape) { fnName ->
                 rustBlockTemplate(
-                    "pub fn $fnName(${context.writerExpression}: &mut #{JsonObjectWriter}, input: &#{Input}) -> Result<(), #{Error}>",
+                    "pub fn $fnName(${context.writerExpression}: &mut #{JsonObjectWriter}, input: &#{Input}) -> #{Result}<(), #{Error}>",
                     "Input" to unionSymbol,
                     *codegenScope,
                 ) {
+                    // Allow customizers to perform pre-serialization operations before handling union variants.
+                    customizations.forEach {
+                        it.section(JsonSerializerSection.BeforeSerializeUnion(context.shape, context.writerExpression))(this)
+                    }
                     rustBlock("match input") {
                         for (member in context.shape.members()) {
                             val variantName =
